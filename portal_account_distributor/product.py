@@ -10,4 +10,4 @@ class product_template(models.Model):
     _inherit = 'product.template'
 
     standard_price = fields.Float(
-        groups='base.group_user,base.group_portal_distributor')
+        groups='base.group_user, base.group_portal_distributor')
