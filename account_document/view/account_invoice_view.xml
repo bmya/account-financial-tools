@@ -14,7 +14,7 @@
                     <field name="document_type_id"/>
                 </field>
                 <group position="inside">
-                    <filter string="Document Type" domain="[]" context="{'group_by':'document_type_id'}"/>
+                    <filter string="Document Type" domain="[]" context="{'group_by': 'document_type_id'}"/>
                 </group>
             </field>
         </record>
@@ -81,13 +81,16 @@
                 <field name="number" position="attributes">
                     <attribute name="invisible">1</attribute>
                 </field>
-
                 <field name="number" position="before">
-                    <field name="display_name" attrs="{'invisible': [('display_name', '=', False)]}" class="oe_inline"/>
-                    <label string="- Next Number: " attrs="{'invisible': [('next_number', 'in', (0, False))]}" class="oe_inline"/>
-                    <field name="next_number" attrs="{'invisible': [('next_number', 'in', (0, False))]}" class="oe_inline"/>
+                    <field name="display_name"
+                           attrs="{'invisible': [('display_name', '=', False)]}"
+                           class="oe_inline"/>
+                    <label string="- Next Number: " attrs="{'invisible': [('next_number', 'in', (0, False))]}"
+                           class="oe_inline"/>
+                    <field name="next_number"
+                           attrs="{'invisible': [('next_number', 'in', (0, False))]}"
+                           class="oe_inline"/>
                 </field>
-           
             </field>
         </record>
 

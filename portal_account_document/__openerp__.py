@@ -2,7 +2,7 @@
 {
     "name": "Accounting Documents integration with Portal",
     "version": "9.0.1.0.0",
-    "author": "Moldeo Interactive,ADHOC SA",
+    "author": "Moldeo Interactive, aDHOC SA",
     "license": "AGPL-3",
     "category": "Accounting",
     "depends": [

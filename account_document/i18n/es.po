@@ -674,7 +674,7 @@ msgstr "Impuestos"
 #. module: account_document
 #: model:ir.model.fields,field_description:account_document.field_account_document_type_taxes_included
 msgid "Taxes Included?"
-msgstr "¿Impuestos incluídos?"
+msgstr "¿Discrimina Impuestos?"
 
 #. module: account_document
 #: model:ir.model,name:account_document.model_account_chart_template

@@ -59,7 +59,7 @@
                 </field>
 
                 <search>
-                    <filter string="Receiptbook" context="{'group_by':'receiptbook_id'}"/>
+                    <filter string="Receiptbook" context="{'group_by': 'receiptbook_id'}"/>
                 </search>
             </field>
         </record>   
