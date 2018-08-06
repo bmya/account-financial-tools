@@ -249,7 +249,7 @@ class AccountInvoice(models.Model):
     def check_use_documents(self):
         """
         check invoices has document class but journal require it (we check
-        all invoices, not only argentinian ones)
+        all invoices, not only chile ones)
         """
         without_doucument_class = self.filtered(
             lambda r: (

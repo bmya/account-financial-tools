@@ -3,10 +3,10 @@
 # For copyright and license notices, see __openerp__.py file in module root
 # directory
 ##############################################################################
-from openerp import fields, models
+from odoo import fields, models
 
 
-class argentinian_base_configuration(models.TransientModel):
+class ChileBaseConfiguration(models.TransientModel):
     _inherit = 'account.config.settings'
 
     group_account_use_financial_amounts = fields.Boolean(

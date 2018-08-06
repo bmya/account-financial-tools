@@ -171,7 +171,7 @@ class res_company_interest(models.Model):
             partner = self.env['res.partner'].browse(partner_id)
             invoice_vals = self._prepare_interest_invoice(
                 partner, debt, to_date)
-            # we send document type for compatibility with argentinian invoices
+            # we send document type for compatibility with chile invoices
             invoice = self.env['account.invoice'].with_context(
                 document_type='debit_note').create(invoice_vals)
             # update amounts for new invoice
