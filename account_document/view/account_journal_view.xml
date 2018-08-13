@@ -10,18 +10,6 @@
                     <field name="id" invisible="1"/>
                     <field name="localization" invisible="1"/>
                 </form>
-
-                <!-- This was just in case we want to replace  -->
-<!--                 <field name="refund_sequence" position="attributes">
-                    <attribute name="attrs">{'invisible': ['|', ('type', 'not in', ['sale', 'purchase']), ('use_documents', '=', True)]}</attribute>
-                </field>
-                <field name="sequence_id" position="attributes">
-                    <attribute name="attrs">{'invisible': [('type', 'in', ['sale', 'purchase']), ('use_documents', '=', True)]}</attribute>
-                </field>
-                <field name="refund_sequence_id" position="attributes">
-                    <attribute name="attrs">{'invisible': ['|', '|', ('type', 'not in', ['sale', 'purchase']), ('refund_sequence', '!=', True), ('use_documents', '=', True)]}</attribute>
-                </field> -->
-
                 <field name="type" position="after">
                     <field name="use_documents" attrs="{'invisible': [('type','not in',['purchase','sale','purchase_refund','sale_refund'])]}"/>
                 </field>
