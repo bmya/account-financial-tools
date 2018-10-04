@@ -64,7 +64,7 @@
                     <field name="journal_type" invisible="1"/>
                     <field name="journal_document_type_id"
                            attrs="{'invisible': [
-                                       '|', ('use_documents', '=', False),
+                                       ('use_documents', '=', False),
                                    ],
                                    'required': [
                                        ('use_documents', '=', True),
