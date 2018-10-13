@@ -52,9 +52,7 @@
             <field name="model">account.invoice</field>
             <field name="inherit_id" ref="account.invoice_form"/>
             <field name="arch" type="xml">
-
                 <field name="date_invoice" position="before">
-
                     <field name="available_journal_document_type_ids" invisible="1"/>
                     <field name="use_documents" invisible="1"/>
                     <field name="journal_document_type_id" invisible="1"/>
