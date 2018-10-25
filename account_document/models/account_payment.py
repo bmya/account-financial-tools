@@ -69,7 +69,7 @@ class AccountPayment(models.Model):
     # )
     receiptbook_id = fields.Many2one(
         'account.payment.receiptbook',
-        'ReceiptBook',
+        'Receipt Book',
         readonly=True,
         states={'draft': [('readonly', False)]},
     )
