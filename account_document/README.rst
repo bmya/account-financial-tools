@@ -24,7 +24,7 @@ TODO
 Configuration
 =============
 
-TODO
+TODO -------
 
 Usage
 =====
