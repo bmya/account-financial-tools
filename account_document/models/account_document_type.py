@@ -47,7 +47,7 @@ class AccountDocmentType(models.Model):
     )
     code = fields.Char(
         'Code',
-        help='Code used by differents localizations',
+        help='Code used by different localizations',
     )
     report_name = fields.Char(
         'Name on Reports',
