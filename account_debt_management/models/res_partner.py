@@ -4,7 +4,7 @@
 # directory
 ##############################################################################
 from odoo import api, models, fields, _
-# from openerp.exceptions import ValidationError
+# from odoo.exceptions import ValidationError
 
 
 class ResPartner(models.Model):
