@@ -1,4 +1,4 @@
-<openerp>
+<odoo>
     <data noupdate="1">
 
         <!-- Create a partner, that is also a portal user -->

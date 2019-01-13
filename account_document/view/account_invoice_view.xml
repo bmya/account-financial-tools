@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<openerp>
+<odoo>
     <data noupdate="0">
 
         <record id="view_account_invoice_filter" model="ir.ui.view">
