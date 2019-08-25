@@ -1,6 +1,5 @@
-# -*- coding: utf-8 -*-
 ##############################################################################
-# For copyright and license notices, see __openerp__.py file in module root
+# For copyright and license notices, see __manifest__.py file in module root
 # directory
 ##############################################################################
 from odoo import models, fields, api
@@ -24,13 +23,16 @@ class AccountPaymentReceiptbook(models.Model):
         'Name',
         size=64,
         required=True,
+        index=True,
     )
     partner_type = fields.Selection(
         [('customer', 'Customer'), ('supplier', 'Vendor')],
         required=True,
+        index=True,
     )
     next_number = fields.Integer(
-        related='sequence_id.number_next_actual'
+        related='sequence_id.number_next_actual',
+        readonly=False,
     )
 
     # payment_type = fields.Selection(

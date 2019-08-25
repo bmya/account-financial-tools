@@ -1,6 +1,5 @@
-# -*- coding: utf-8 -*-
 ##############################################################################
-# For copyright and license notices, see __openerp__.py file in module root
+# For copyright and license notices, see __manifest__.py file in module root
 # directory
 ##############################################################################
 from odoo import models, fields, api, _
@@ -24,7 +23,6 @@ class AccountPayment(models.Model):
     _rec_name we are changing _name_get
     """
     _inherit = "account.payment"
-    _rec_name = "display_name"
 
     # document_number = fields.Char(
     #     string=_('Document Number'),
@@ -36,15 +34,14 @@ class AccountPayment(models.Model):
         string='Document Number',
         copy=False,
         readonly=True,
-        states={'draft': [('readonly', False)]}
+        states={'draft': [('readonly', False)]},
+        index=True,
     )
     document_sequence_id = fields.Many2one(
         related='receiptbook_id.sequence_id',
-        readonly=True,
     )
     localization = fields.Selection(
         related='company_id.localization',
-        readonly=True,
     )
     # por ahora no agregamos esto, vamos a ver si alguien lo pide
     # manual_prefix = fields.Char(
@@ -72,14 +69,14 @@ class AccountPayment(models.Model):
         'ReceiptBook',
         readonly=True,
         states={'draft': [('readonly', False)]},
+        auto_join=True,
     )
     document_type_id = fields.Many2one(
         related='receiptbook_id.document_type_id',
-        readonly=True,
     )
     next_number = fields.Integer(
         # related='receiptbook_id.sequence_id.number_next_actual',
-        compute='_get_next_number',
+        compute='_compute_next_number',
         string='Next Number',
     )
     display_name = fields.Char(
@@ -103,7 +100,7 @@ class AccountPayment(models.Model):
         'journal_id.sequence_id.number_next_actual',
         'receiptbook_id.sequence_id.number_next_actual',
     )
-    def _get_next_number(self):
+    def _compute_next_number(self):
         """
         show next number only for payments without number and on draft state
         """
@@ -140,16 +137,16 @@ class AccountPayment(models.Model):
         * If document number and document type, we show them
         * Else, we show name
         """
-        for x in self:
+        for rec in self:
             if (
-                    x.state == 'posted' and x.document_number and
-                    x.document_type_id):
+                    rec.state == 'posted' and rec.document_number and
+                    rec.document_type_id):
                 display_name = ("%s%s" % (
-                    x.document_type_id.doc_code_prefix or '',
-                    x.document_number))
+                    rec.document_type_id.doc_code_prefix or '',
+                    rec.document_number))
             else:
-                display_name = x.name
-            x.display_name = display_name
+                display_name = rec.name
+            rec.display_name = display_name
 
     # TODO esta constraint si la creamos hay que borrarla en
     # account_payment_group_document
@@ -157,12 +154,13 @@ class AccountPayment(models.Model):
     #     ('document_number_uniq', 'unique(document_number, receiptbook_id)',
     #         'Document number must be unique per receiptbook!')]
 
-    @api.one
-    @api.constrains('company_id', 'partner_type')
+    @api.multi
+    @api.constrains('journal_id', 'partner_type')
     def _force_receiptbook(self):
         # we add cosntrins to fix odoo tests and also help in inmpo of data
-        if not self.receiptbook_id:
-            self.receiptbook_id = self._get_receiptbook()
+        for rec in self:
+            if not rec.receiptbook_id:
+                rec.receiptbook_id = rec._get_receiptbook()
 
     @api.onchange('company_id', 'partner_type')
     def get_receiptbook(self):
@@ -207,14 +205,15 @@ class AccountPayment(models.Model):
         vals['document_number'] = document_number
         return vals
 
-    @api.one
-    @api.constrains('receiptbook_id', 'company_id')
+    @api.multi
+    @api.constrains('receiptbook_id', 'journal_id')
     def _check_company_id(self):
         """
         Check receiptbook_id and voucher company
         """
-        if (self.receiptbook_id and
-                self.receiptbook_id.company_id != self.company_id):
+        if self.filtered(
+                lambda x: x.receiptbook_id and
+                x.receiptbook_id.company_id != x.journal_id.company_id):
             raise ValidationError(_(
                 'The company of the receiptbook and of the '
                 'payment must be the same!'))

@@ -1,13 +1,12 @@
-# -*- coding: utf-8 -*-
 ##############################################################################
-# For copyright and license notices, see __openerp__.py file in module root
+# For copyright and license notices, see __manifest__.py file in module root
 # directory
 ##############################################################################
-from openerp import api, fields, models, _
-from openerp.exceptions import ValidationError
+from odoo import api, fields, models, _
+from odoo.exceptions import ValidationError
 
 
-class account_debt_report_wizard(models.TransientModel):
+class AccountDebtReportWizard(models.TransientModel):
     _name = 'account.debt.report.wizard'
     _description = 'Account Debt Report Wizard'
 
@@ -57,8 +56,20 @@ class account_debt_report_wizard(models.TransientModel):
         if not active_ids:
             return True
         partners = self.env['res.partner'].browse(active_ids)
-        report = 'account_debt_report'
-        return self.env['report'].with_context(
+        data = {
+            'secondary_currency': self.secondary_currency,
+            'financial_amounts': self.financial_amounts,
+            'result_selection': self.result_selection,
+            'company_type': self.company_type,
+            'company_id': self.company_id.id,
+            'from_date': self.from_date,
+            'to_date': self.to_date,
+            'historical_full': self.historical_full,
+            'show_invoice_detail': self.show_invoice_detail,
+        }
+        return self.env['ir.actions.report'].search(
+            [('report_name', '=', 'account_debt_report')],
+            limit=1).with_context(
             secondary_currency=self.secondary_currency,
             financial_amounts=self.financial_amounts,
             result_selection=self.result_selection,
@@ -69,7 +80,7 @@ class account_debt_report_wizard(models.TransientModel):
             historical_full=self.historical_full,
             show_invoice_detail=self.show_invoice_detail,
             # show_receipt_detail=self.show_receipt_detail,
-        ).get_action(partners, report)
+        ).report_action(partners, data=data)
 
     @api.multi
     def send_by_email(self):

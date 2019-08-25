@@ -1,5 +1,6 @@
-# -*- coding: utf-8 -*-
-from openerp import tools, models, fields, api, _
+from odoo import tools, models, fields, api, _
+from odoo.tools import float_is_zero
+from odoo.exceptions import UserError
 from ast import literal_eval
 
 
@@ -90,6 +91,10 @@ class AccountDebtLine(models.Model):
     #     'Status',
     #     readonly=True
     # )
+    full_reconcile_id = fields.Many2one(
+        'account.full.reconcile',
+        readonly=True,
+    )
     reconciled = fields.Boolean(
     )
     partner_id = fields.Many2one(
@@ -141,7 +146,7 @@ class AccountDebtLine(models.Model):
     )
     company_currency_id = fields.Many2one(
         related='company_id.currency_id',
-        readonly=True,
+        string='Company Currency',
     )
     payment_group_id = fields.Many2one(
         'account.payment.group',
@@ -214,7 +219,7 @@ class AccountDebtLine(models.Model):
                 [('id', 'in', move_lines_str)])
 
             rec.move_line_ids = move_lines
-            rec.name = ', '.join(move_lines.mapped('name'))
+            rec.name = ', '.join(move_lines.filtered('name').mapped('name'))
             rec.move_ids = rec.move_line_ids.mapped('move_id')
             if len(rec.move_ids) == 1:
                 rec.move_id = rec.move_ids
@@ -225,10 +230,15 @@ class AccountDebtLine(models.Model):
                     len(move_lines) == 1 and move_lines[0] or
                     rec.env['account.move.line'])
 
-            rec.invoice_id = rec.move_line_id.invoice_id
-            rec.payment_group_id = rec.move_line_id.mapped(
+            invoice_id = rec.move_line_ids.mapped('invoice_id')
+            rec.invoice_id = len(invoice_id) == 1 and invoice_id
+
+            payment_group = rec.move_line_ids.mapped(
                 'payment_id.payment_group_id')
-            rec.statement_id = rec.move_line_id.statement_id
+            rec.payment_group_id = len(payment_group) == 1 and payment_group
+
+            statement = rec.move_line_ids.mapped('statement_id')
+            rec.statement_id = len(statement) == 1 and statement
             # invoices = rec.move_line_ids.mapped('invoice_id')
             # if len(invoices) == 1:
             #     rec.invoice_id = invoices
@@ -247,10 +257,12 @@ class AccountDebtLine(models.Model):
             rec.financial_amount_residual = sum(
                 rec.move_line_ids.mapped('financial_amount_residual'))
 
-    def init(self, cr):
-        tools.drop_view_if_exists(cr, self._table)
-        date_maturity_type = self.pool['ir.config_parameter'].get_param(
-            cr, 1, 'account_debt_management.date_maturity_type')
+    @api.model_cr
+    def init(self):
+        # pylint: disable=E8103
+        tools.drop_view_if_exists(self._cr, self._table)
+        date_maturity_type = self.env['ir.config_parameter'].sudo().get_param(
+            'account_debt_management.date_maturity_type')
         if date_maturity_type == 'detail':
             params = ('l.date_maturity as date_maturity,', ', l.date_maturity')
         elif date_maturity_type == 'max':
@@ -272,6 +284,7 @@ class AccountDebtLine(models.Model):
                 %s
                 am.document_type_id as document_type_id,
                 c.document_number as document_number,
+                full_reconcile_id,
                 bool_and(l.reconciled) as reconciled,
                 -- l.blocked as blocked,
                 -- si cualquier deuda esta bloqueada de un comprobante,
@@ -336,11 +349,12 @@ class AccountDebtLine(models.Model):
                 a.internal_type IN ('payable', 'receivable')
             GROUP BY
                 l.partner_id, am.company_id, l.account_id, l.currency_id,
+                l.full_reconcile_id,
                 a.internal_type, a.user_type_id, c.document_number,
                 am.document_type_id %s
                 -- dt.doc_code_prefix, am.document_number
         """ % params
-        cr.execute("""CREATE or REPLACE VIEW %s as (%s
+        self._cr.execute("""CREATE or REPLACE VIEW %s as (%s
         )""" % (self._table, query))
 
     # TODO tal vez podamos usar métodos agregados por account_usability
@@ -390,3 +404,47 @@ class AccountDebtLine(models.Model):
             self.move_id.id,
             _('View Move'),
             False]
+
+    @api.multi
+    def cancel_amount_residual_currency(self):
+        """Agregamos este metodo (y el botón) para cancelar la deuda en moneda
+        en los casos donde no se canceló automaticamente el importe en esa
+        divisa
+        """
+        # al final esto lo hacemos por vista, ademas tampoco es tan critico
+        # porque podrian hacer este ajuste manualmente
+        # if not self.user_has_groups('account.group_account_manager'):
+        #     group = self.env.ref('account.group_account_manager')
+        #     raise UserError(_(
+        #         'Only users with group "%s / %s" group can cancel amount '
+        #         'residual') % (group.category_id.name, group.name))
+        self = self.with_context(default_ref=_(
+            'Ajuste manual de deuda en divisa'))
+        for aml in self.mapped('move_line_ids'):
+            if not float_is_zero(
+                    aml.amount_residual,
+                    precision_rounding=aml.company_currency_id.rounding):
+                raise UserError(_(
+                    'No se puede cancelar el resisual en moneda porque el '
+                    'apunte %s aún tiene saldo contable.' % aml.id))
+
+            partial_rec = aml.credit and aml.matched_debit_ids[0] or \
+                aml.matched_credit_ids[0]
+
+            exchange_move = self.env['account.move'].create(
+                self.env['account.full.reconcile']._prepare_exchange_diff_move(
+                    move_date=aml.date, company=aml.company_id))
+            partial_rec.with_context(
+                skip_full_reconcile_check=True).create_exchange_rate_entry(
+                    aml, 0.0, aml.amount_residual_currency,
+                    aml.currency_id, exchange_move)
+            exchange_move.post()
+
+            # verificamos que se haya conciliado correctamente
+            if not float_is_zero(
+                    aml.amount_residual_currency,
+                    precision_rounding=aml.company_currency_id.rounding):
+                raise UserError(_(
+                    "No se puedo cancelar el residual en moneda "
+                    "automáticamente. Debe hacerlo manualmente. Id de apunte "
+                    "contable: %s") % aml.id)

@@ -1,11 +1,11 @@
-# -*- coding: utf-8 -*-
 ##############################################################################
-# For copyright and license notices, see __openerp__.py file in module root
+# For copyright and license notices, see __manifest__.py file in module root
 # directory
 ##############################################################################
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
-# import openerp.addons.decimal_precision as dp
+from functools import partial
+# import odoo.addons.decimal_precision as dp
 # import re
 from odoo.tools.misc import formatLang
 import logging
@@ -29,27 +29,20 @@ class AccountInvoice(models.Model):
     _order = "date_invoice desc, document_number desc, number desc, id desc"
     # _order = "document_number desc, number desc, id desc"
 
-    report_amount_tax = fields.Monetary(
-        string='Tax',
-        compute='_compute_report_amount_and_taxes'
-    )
     report_amount_untaxed = fields.Monetary(
-        string='Untaxed Amount',
         compute='_compute_report_amount_and_taxes'
     )
     report_tax_line_ids = fields.One2many(
         compute="_compute_report_amount_and_taxes",
         comodel_name='account.invoice.tax',
-        string='Taxes'
     )
     available_journal_document_type_ids = fields.Many2many(
         'account.journal.document.type',
-        compute='get_available_journal_document_types',
-        string='Available Journal Document Types',
+        compute='_compute_available_journal_document_types',
     )
     journal_document_type_id = fields.Many2one(
         'account.journal.document.type',
-        'Document Type',
+        'Journal Document Type',
         readonly=True,
         ondelete='restrict',
         copy=False,
@@ -59,14 +52,14 @@ class AccountInvoice(models.Model):
     # we add this fields so we can search, group and analyze by this one
     document_type_id = fields.Many2one(
         related='journal_document_type_id.document_type_id',
+        string='Document Type',
         copy=False,
-        readonly=True,
         store=True,
         auto_join=True,
+        index=True,
     )
     document_sequence_id = fields.Many2one(
         related='journal_document_type_id.sequence_id',
-        readonly=True,
     )
     document_number = fields.Char(
         string='Document Number',
@@ -74,44 +67,46 @@ class AccountInvoice(models.Model):
         readonly=True,
         states={'draft': [('readonly', False)]},
         track_visibility='onchange',
+        index=True,
     )
     display_name = fields.Char(
-        compute='_get_display_name',
+        compute='_compute_display_name',
         string='Document Reference',
     )
     next_number = fields.Integer(
-        compute='_get_next_number',
-        string='Next Number',
+        compute='_compute_next_number',
+        string='Next Number (Computed)',
     )
     use_documents = fields.Boolean(
         related='journal_id.use_documents',
         string='Use Documents?',
-        readonly=True
     )
     localization = fields.Selection(
         related='company_id.localization',
-        readonly=True,
     )
     document_type_internal_type = fields.Selection(
         related='document_type_id.internal_type',
-        readonly=True,
     )
 
-#    @api.multi
-#    def _get_tax_amount_by_group(self):
-#        """
-#        we can not inherit because of function design, we overwrite
-#        """
-#        self.ensure_one()
-#        res = {}
-#        currency = self.currency_id or self.company_id.currency_id
-#        for line in self.report_tax_line_ids:
-#            res.setdefault(line.tax_id.tax_group_id, 0.0)
-#            res[line.tax_id.tax_group_id] += line.amount
-#        res = sorted(res.items(), key=lambda l: l[0].sequence)
-#        res = map(lambda l: (
-#            l[0].name, formatLang(self.env, l[1], currency_obj=currency)), res)
-#        return res
+    def _amount_by_group(self):
+        invoice_with_doc_type = self.filtered('document_type_id')
+        for invoice in invoice_with_doc_type:
+            currency = invoice.currency_id or invoice.company_id.currency_id
+            fmt = partial(formatLang, invoice.with_context(lang=invoice.partner_id.lang).env, currency_obj=currency)
+            res = {}
+            for line in invoice.report_tax_line_ids:
+                tax = line.tax_id
+                group_key = (tax.tax_group_id, tax.amount_type, tax.amount)
+                res.setdefault(group_key, {'base': 0.0, 'amount': 0.0})
+                res[group_key]['amount'] += line.amount_total
+                res[group_key]['base'] += line.base
+            res = sorted(res.items(), key=lambda l: l[0][0].sequence)
+            invoice.amount_by_group = [(
+                r[0][0].name, r[1]['amount'], r[1]['base'],
+                fmt(r[1]['amount']), fmt(r[1]['base']),
+                len(res),
+            ) for r in res]
+        super(AccountInvoice, self - invoice_with_doc_type)._amount_by_group()
 
     @api.depends(
         'amount_untaxed', 'amount_tax', 'tax_line_ids', 'document_type_id')
@@ -121,7 +116,6 @@ class AccountInvoice(models.Model):
                 invoice.document_type_id and
                 invoice.document_type_id.get_taxes_included() or False)
             if not taxes_included:
-                report_amount_tax = invoice.amount_tax
                 report_amount_untaxed = invoice.amount_untaxed
                 not_included_taxes = invoice.tax_line_ids
             else:
@@ -129,10 +123,8 @@ class AccountInvoice(models.Model):
                     lambda x: x.tax_id in taxes_included)
                 not_included_taxes = (
                     invoice.tax_line_ids - included_taxes)
-                report_amount_tax = sum(not_included_taxes.mapped('amount'))
                 report_amount_untaxed = invoice.amount_untaxed + sum(
                     included_taxes.mapped('amount'))
-            invoice.report_amount_tax = report_amount_tax
             invoice.report_amount_untaxed = report_amount_untaxed
             invoice.report_tax_line_ids = not_included_taxes
 
@@ -141,7 +133,7 @@ class AccountInvoice(models.Model):
         'journal_id.sequence_id.number_next_actual',
         'journal_document_type_id.sequence_id.number_next_actual',
     )
-    def _get_next_number(self):
+    def _compute_next_number(self):
         """
         show next number only for invoices without number and on draft state
         """
@@ -173,19 +165,12 @@ class AccountInvoice(models.Model):
 
     @api.multi
     def name_get(self):
-        TYPES = {
-            'out_invoice': _('Invoice'),
-            'in_invoice': _('Vendor Bill'),
-            'out_refund': _('Refund'),
-            'in_refund': _('Vendor Refund'),
-        }
         result = []
         for inv in self:
             result.append((
                 inv.id,
                 "%s %s" % (
-                    inv.display_name or TYPES[inv.type],
-                    inv.name or '')))
+                    inv.display_name, inv.name or '')))
         return result
 
     @api.model
@@ -200,7 +185,7 @@ class AccountInvoice(models.Model):
             recs = self.search([('name', operator, name)] + args, limit=limit)
         return recs.name_get()
 
-    @api.one
+    @api.multi
     @api.constrains(
         'journal_id',
         'partner_id',
@@ -212,22 +197,21 @@ class AccountInvoice(models.Model):
         y como con la funcion anterior solo se almacenan solo si se crea desde
         interfaz, hacemos este hack de constraint para computarlos si no estan
         computados"""
-        if (
-                not self.journal_document_type_id and
-                self.available_journal_document_type_ids
-        ):
-            self.journal_document_type_id = (
-                self._get_available_journal_document_types(
-                    self.journal_id, self.type, self.partner_id
+        for rec in self.filtered(
+                lambda x: not x.journal_document_type_id and
+                x.available_journal_document_type_ids):
+            rec.journal_document_type_id = (
+                rec._get_available_journal_document_types(
+                    rec.journal_id, rec.type, rec.partner_id
                 ).get('journal_document_type'))
 
-    @api.one
+    @api.multi
     @api.depends(
         'move_name',
         'document_number',
         'document_type_id.doc_code_prefix'
     )
-    def _get_display_name(self):
+    def _compute_display_name(self):
         """
         If move_name then invoice has been validated, then:
         * If document number and document type, we show them
@@ -237,19 +221,26 @@ class AccountInvoice(models.Model):
         # mostrar igual si existe el numero, por ejemplo si es factura de
         # proveedor
         # if self.document_number and self.document_type_id and self.move_name:
-        if self.document_number and self.document_type_id:
-            display_name = ("%s%s" % (
-                self.document_type_id.doc_code_prefix or '',
-                self.document_number))
-        else:
-            display_name = self.move_name
-        self.display_name = display_name
+        TYPES = {
+            'out_invoice': _('Invoice'),
+            'in_invoice': _('Vendor Bill'),
+            'out_refund': _('Credit Note'),
+            'in_refund': _('Vendor Credit note'),
+        }
+        for rec in self:
+            if rec.document_number and rec.document_type_id:
+                display_name = ("%s%s" % (
+                    rec.document_type_id.doc_code_prefix or '',
+                    rec.document_number))
+            else:
+                display_name = rec.move_name or TYPES[rec.type]
+            rec.display_name = display_name
 
     @api.multi
     def check_use_documents(self):
         """
         check invoices has document class but journal require it (we check
-        all invoices, not only chile ones)
+        all invoices, not only argentinian ones)
         """
         without_doucument_class = self.filtered(
             lambda r: (
@@ -321,8 +312,25 @@ class AccountInvoice(models.Model):
         return True
 
     @api.multi
+    # creo que por el parche de del def onchange no estaria funcionando
+    # y por eseo repetimos onchnage de cada elemento
+    # TODO analizar en v11
+    # @api.onchange('available_journal_document_type_ids')
+    @api.onchange('journal_id', 'partner_id', 'company_id')
+    def onchange_available_journal_document_types(self):
+        res = self._get_available_journal_document_types(
+            self.journal_id, self.type, self.partner_id)
+        self.journal_document_type_id = res['journal_document_type']
+        # las localizaciones no siempre devuelven el primero como el que debe
+        # sugerir por defecto, si cambiamos para que asi sea entonces podemos
+        # cambiar esto aca
+        # self.journal_document_type_id = self.\
+        #     available_journal_document_type_ids and self.\
+        #     available_journal_document_type_ids[0] or False
+
+    @api.multi
     @api.depends('journal_id', 'partner_id', 'company_id')
-    def get_available_journal_document_types(self):
+    def _compute_available_journal_document_types(self):
         """
         This function should only be inherited if you need to add another
         "depends", for eg, if you need to add a depend on "new_field" you
@@ -340,8 +348,12 @@ class AccountInvoice(models.Model):
                 invoice.journal_id, invoice.type, invoice.partner_id)
             invoice.available_journal_document_type_ids = res[
                 'available_journal_document_types']
-            invoice.journal_document_type_id = res[
-                'journal_document_type']
+            # esto antes lo haciamos aca pero computaba mal el proximo numero
+            # de factura cuando se seleccionaba otro tipo de doc que no sea
+            # el por defecto (por ej, nota de debito), lo separamos en un
+            # onchange aparte
+            # invoice.journal_document_type_id = res[
+            #     'journal_document_type']
 
     @api.multi
     def write(self, vals):
@@ -373,6 +385,15 @@ class AccountInvoice(models.Model):
         this invoice
         * 'journal_document_type': suggested document type on this invoice
         """
+        # if journal dont use documents return empty recordsets just in case
+        # there are journal_document_type_ids related to the journal
+        if not journal.use_documents:
+            return {
+                'available_journal_document_types':
+                    self.env['account.journal.document.type'],
+                'journal_document_type':
+                    self.env['account.journal.document.type'],
+            }
         # As default we return every journal document type, and if one exists
         # then we return the first one as suggested
         journal_document_types = journal.journal_document_type_ids
@@ -397,18 +418,14 @@ class AccountInvoice(models.Model):
     @api.constrains('document_type_id', 'document_number')
     @api.onchange('document_type_id', 'document_number')
     def validate_document_number(self):
-        for rec in self:
-            # if we have a sequence, number is set by sequence and we dont
-            # check this
-            if rec.document_sequence_id:
-                continue
-            document_type = rec.document_type_id
-
-            if rec.document_type_id:
-                res = document_type.validate_document_number(
-                    rec.document_number)
-                if res and res != rec.document_number:
-                    rec.document_number = res
+        # if we have a sequence, number is set by sequence and we dont
+        # check this
+        for rec in self.filtered(
+                lambda x: not x.document_sequence_id and x.document_type_id):
+            res = rec.document_type_id.validate_document_number(
+                rec.document_number)
+            if res and res != rec.document_number:
+                rec.document_number = res
 
     @api.multi
     @api.constrains('journal_document_type_id', 'journal_id')
@@ -461,3 +478,43 @@ class AccountInvoice(models.Model):
         if refund_document_number:
             values['document_number'] = refund_document_number
         return values
+
+    @api.multi
+    def _check_duplicate_supplier_reference(self):
+        """We make reference only unique if you are not using documents.
+        Documents already guarantee to not encode twice same vendor bill.
+        """
+        return super(
+            AccountInvoice, self.filtered(lambda x: not x.use_documents))
+
+    @api.multi
+    @api.constrains('document_number', 'partner_id', 'company_id')
+    def _check_document_number_unique(self):
+        """ We dont implement this on _check_duplicate_supplier_reference
+        because we want to check it on data entry and also because we validate
+        customer invoices (not only supplier ones)
+        """
+        for rec in self.filtered(
+                lambda x: x.use_documents and x.document_number):
+            domain = [
+                ('type', '=', rec.type),
+                ('document_number', '=', rec.document_number),
+                ('document_type_id', '=', rec.document_type_id.id),
+                ('company_id', '=', rec.company_id.id),
+                ('id', '!=', rec.id)
+            ]
+            msg = (
+                'Error en factura con id %s: El numero de comprobante (%s)'
+                ' debe ser unico por tipo de documento')
+            if rec.type in ['out_invoice', 'out_refund']:
+                # si es factura de cliente entonces tiene que ser numero
+                # unico por compania y tipo de documento
+                rec.search(domain)
+            else:
+                # si es factura de proveedor debe ser unica por proveedor
+                domain += [
+                    ('partner_id.commercial_partner_id', '=',
+                        rec.commercial_partner_id.id)]
+                msg += ' y proveedor'
+            if rec.search(domain):
+                raise UserError(msg % (rec.id, rec.document_number))

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
@@ -28,7 +27,6 @@ class AccountInvoiceRefund(models.TransientModel):
     use_documents = fields.Boolean(
         related='invoice_id.journal_id.use_documents',
         string='Use Documents?',
-        readonly=True,
     )
     journal_document_type_id = fields.Many2one(
         'account.journal.document.type',
@@ -37,14 +35,13 @@ class AccountInvoiceRefund(models.TransientModel):
     )
     document_sequence_id = fields.Many2one(
         related='journal_document_type_id.sequence_id',
-        readonly=True,
     )
     document_number = fields.Char(
         string='Document Number',
     )
     available_journal_document_type_ids = fields.Many2many(
         'account.journal.document.type',
-        compute='get_available_journal_document_types',
+        compute='_compute_available_journal_document_types',
         string='Available Journal Document Types',
     )
 
@@ -69,7 +66,7 @@ class AccountInvoiceRefund(models.TransientModel):
 
     @api.multi
     @api.depends('invoice_id')
-    def get_available_journal_document_types(self):
+    def _compute_available_journal_document_types(self):
         for rec in self:
             invoice = rec.invoice_id
             if not invoice:

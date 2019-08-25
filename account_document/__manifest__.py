@@ -1,8 +1,7 @@
-# -*- coding: utf-8 -*-
 {
     "name": "Accounting Documents Management",
-    "version": "11.0.1.9.0",
-    "author": "Moldeo Interactive, aDHOC SA, Odoo Community Association (OCA)",
+    "version": "12.0.1.0.0",
+    "author": "Moldeo Interactive,ADHOC SA",
     "license": "AGPL-3",
     "category": "Accounting",
     "depends": [
@@ -22,12 +21,12 @@
         'view/account_payment_view.xml',
         'view/account_payment_receiptbook_view.xml',
         'view/menuitem.xml',
-        'wizards/account_journal_merge_wizard_view.xml',
+        'view/account_portal_templates.xml',
         'report/invoice_report_view.xml',
         'data/account.document.type.csv',
         'data/mail_template_invoice.xml',
         'wizards/account_invoice_refund_view.xml',
-        'res_config_view.xml',
+        'wizards/res_config_view.xml',
         'security/ir.model.access.csv',
         'security/security.xml',
     ],
@@ -36,4 +35,5 @@
     'images': [
     ],
     'installable': True,
+    'post_init_hook': 'post_init_hook',
 }

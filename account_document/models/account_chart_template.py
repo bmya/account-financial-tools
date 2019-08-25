@@ -1,10 +1,9 @@
-# -*- coding: utf-8 -*-
 ##############################################################################
-# For copyright and license notices, see __openerp__.py file in module root
+# For copyright and license notices, see __manifest__.py file in module root
 # directory
 ##############################################################################
 from odoo import models, api, fields, _
-from odoo.addons.account_document.models.res_company import ResCompany
+from odoo.http import request
 import logging
 _logger = logging.getLogger(__name__)
 
@@ -12,17 +11,13 @@ _logger = logging.getLogger(__name__)
 class AccountChartTemplate(models.Model):
     _inherit = 'account.chart.template'
 
-    # _get_localizations = (
-    #     lambda self, *args, **kwargs: self.env[
-    #         'res.company']._get_localizations(*args, **kwargs))
-
     def _get_localizations(self):
-        localizations = self.env['res.company']._fields['localization']._description_selection(self.env)
+        localizations = self.env['res.company']._fields[
+            'localization']._description_selection(self.env)
         return localizations
 
     localization = fields.Selection(
         _get_localizations,
-        #ResCompany._localization_selection,
         'Localization',
         help='If you set the localization here, then when installing '
         'this chart, this localization will be set on company'
@@ -30,19 +25,17 @@ class AccountChartTemplate(models.Model):
 
     @api.multi
     def _load_template(
-            self, company, code_digits=None, transfer_account_id=None,
-            account_ref=None, taxes_ref=None):
+            self, company, code_digits=None, account_ref=None, taxes_ref=None):
         """
         Set localization to company when installing chart of account.
         """
         self.ensure_one()
         if not company.localization:
-            company.localization = self.localization
+            company.localization = self and self.localization
         if company.localization:
             self.generate_receiptbooks(company)
         return super(AccountChartTemplate, self)._load_template(
-            company, code_digits, transfer_account_id,
-            account_ref, taxes_ref)
+            company, code_digits, account_ref, taxes_ref)
 
     @api.model
     def generate_receiptbooks(
@@ -132,3 +125,28 @@ class AccountChartTemplate(models.Model):
                     vals_journal['use_documents'] = self._context.get(
                         'purchase_use_documents', True)
         return journal_data
+
+    def load_for_current_company(self, sale_tax_rate, purchase_tax_rate):
+        """ When we load a chart of account and set a default tax, add this tax
+        to every product """
+        res = super().load_for_current_company(
+            sale_tax_rate, purchase_tax_rate)
+
+        if request and request.session.uid:
+            current_user = self.env['res.users'].browse(request.uid)
+            company = current_user.company_id
+        else:
+            # fallback to company of current user, most likely __system__
+            # (won't work well for multi-company)
+            company = self.env.user.company_id
+
+        prod_templates = self.env['product.template'].search([])
+        if company.account_sale_tax_id:
+            prod_templates.write({
+                'taxes_id': [(4, company.account_sale_tax_id.id)],
+            })
+        if company.account_purchase_tax_id:
+            prod_templates.write({
+                'supplier_taxes_id': [(4, company.account_purchase_tax_id.id)],
+            })
+        return res
