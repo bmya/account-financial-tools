@@ -40,6 +40,13 @@ class AccountChartTemplate(models.Model):
             company.localization = self.localization
         if company.localization:
             self.generate_receiptbooks(company)
+        # debug lines
+        _logger.info('a ' * 10)
+        _logger.info(account_ref)
+        account_template_ref = self.generate_account(taxes_ref, account_ref, code_digits, company)
+        _logger.info(account_template_ref)
+        _logger.info(company)
+        # debug
         return super(AccountChartTemplate, self)._load_template(
             company, code_digits, transfer_account_id,
             account_ref, taxes_ref)
