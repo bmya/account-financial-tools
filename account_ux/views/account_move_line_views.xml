@@ -65,9 +65,6 @@
             <field name="credit" position="after">
                 <field name="balance" sum="Balance" readonly="1" optional="hide"/>
             </field>
-            <field name="full_reconcile_id" position="attributes">
-                <attribute name="optional">hide</attribute>
-            </field>
         </field>
     </record>
 
@@ -118,28 +115,22 @@
                     <field name="reconciled"/>
                 </group>
             </group>
-            <field name="matched_credit_ids" position="replace"/>
-            <field name="matched_debit_ids" position="replace"/>
-            <label for="full_reconcile_id" position="before">
+            <field name="matched_credit_ids" position="after">
                 <field name="matched_credit_ids" readonly="1" >
                     <tree create="0">
                         <field name="credit_move_id"/>
                         <field name="amount" sum="Total"/>
-                        <field name="amount_currency" sum="Total"/>
                         <field name="company_currency_id" invisible="1"/>
-                        <field name="currency_id" invisible="1"/>
                     </tree>
                 </field>
                 <field name="matched_debit_ids" readonly="1" >
                     <tree create="0">
                         <field name="debit_move_id"/>
                         <field name="amount" sum="Total"/>
-                        <field name="amount_currency" sum="Total"/>
                         <field name="company_currency_id" invisible="1"/>
-                        <field name="currency_id" invisible="1"/>
                     </tree>
                 </field>
-            </label>
+            </field>
         </field>
     </record>
 
