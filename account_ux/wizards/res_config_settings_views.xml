@@ -6,6 +6,9 @@
         <field name="inherit_id" ref="account.res_config_settings_view_form"/>
         <field name="arch" type="xml">
             <!-- on sale we use xpath because website_sale adds same field -->
+            <xpath expr="//div[@data-key='account']//label[@for='sale_tax_id']" position="before">
+                <field name="sale_tax_ids" invisible="1"/>
+            </xpath>
             <xpath expr="//div[@data-key='account']//label[@for='sale_tax_id']" position="attributes">
                 <attribute name="for">sale_tax_ids</attribute>
             </xpath>
@@ -15,7 +18,6 @@
                 <attribute name="widget">many2many_tags</attribute>
                 <attribute name="options">{'no_create': True, 'no_open': True}</attribute>
             </xpath>
-
             <label for="purchase_tax_id" position="attributes">
                 <attribute name="for">purchase_tax_ids</attribute>
             </label>

@@ -9,7 +9,7 @@
                 <field name="invoice_type" invisible="1"/>
                 <field name="invoice_company_id" invisible="1"/>
                 <group>
-                    <field name="tax_id" context="{'type':invoice_type}" domain="[('company_id', '=', invoice_company_id)]" options="{'no_create': True, 'no_open': True}"/>
+                    <field name="tax_id" context="{'type': invoice_type}" domain="[('company_id', '=', invoice_company_id)]" options="{'no_create': True, 'no_open': True}"/>
                     <field name="name"/>
                     <field domain="[('company_id', '=', invoice_company_id)]" name="account_analytic_id" groups="analytic.group_analytic_accounting"/>
                     <field name="base"/>

@@ -40,7 +40,7 @@ class AccountInvoiceTaxWizard(models.TransientModel):
         'Analytic Account',
     )
     invoice_type = fields.Selection(
-        related='move_id.type',
+        related='move_id.move_type',
         string='Invoice Type',
     )
     invoice_company_id = fields.Many2one(
