@@ -55,10 +55,11 @@
                 <field name="reversed_entry_id" attrs="{'invisible': [('move_type', '!=', 'out_refund')]}"/>
             </field>
 
+            <!-- we remove these attributes since are not compatible with l10n_cl_edi: fetchmail_server
             <field name="currency_id" position="attributes">
                 <attribute name="readonly">True</attribute>
                 <attribute name="force_save">1</attribute>
-            </field>
+            </field>-->
 
             <field name="currency_id" position="after">
                 <button name="%(action_account_change_currency)d" type="action" attrs="{'invisible':[('state','!=','draft')]}" icon="fa-pencil" class="btn-link"/>
