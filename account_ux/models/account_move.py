@@ -203,7 +203,7 @@ class AccountMove(models.Model):
         self.mapped('line_ids.statement_line_id').write({'move_name': False})
         return super().unlink()
 
-    def _recompute_tax_lines(self, recompute_tax_base_amount=False):
+    def _recompute_tax_lines(self, recompute_tax_base_amount=False, tax_rep_lines_to_recompute=None):
         """ Odoo recomputa todos los impuestos cada vez que hay un cambio en la factura, esto trae dos problemas:
         1. Es molesto para los usuarios que, luego de haber cargado las percepciones, quieren hacer una modificacion
         y se les recomputa todo
