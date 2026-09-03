@@ -100,13 +100,43 @@ class AccountMoveLine(models.Model):
                 res["partial_values"]["credit_amount_currency"] = credit_values["aml"].currency_id.round(
                     res["partial_values"]["credit_amount_currency"] * rate
                 )
+                # El residual que devuelve super quedó expresado en moneda de la compañía (por el shadow de
+                # arriba). Lo reexpresamos en la moneda secundaria real a la cotización del comprobante, igual
+                # que hacemos con el partial. Si no, el residual queda con el valor en moneda de compañía pero
+                # asociado a un apunte cuya currency_id es la secundaria, y cualquier consumidor del residual
+                # (ej. el wizard de conciliación / ajuste) lo interpreta como moneda secundaria sin convertir.
+                if res.get("credit_values"):
+                    res["credit_values"]["amount_residual_currency"] = credit_values["aml"].currency_id.round(
+                        res["credit_values"]["amount_residual"] * rate
+                    )
             if "original_currency" in debit_values:
                 debit_values["currency"] = debit_values["original_currency"]
                 rate = get_accounting_rate(debit_values)
-                res["partial_values"]["debit_amount_currency"] = credit_values["aml"].currency_id.round(
+                res["partial_values"]["debit_amount_currency"] = debit_values["aml"].currency_id.round(
                     res["partial_values"]["debit_amount_currency"] * rate
                 )
+                if res.get("debit_values"):
+                    res["debit_values"]["amount_residual_currency"] = debit_values["aml"].currency_id.round(
+                        res["debit_values"]["amount_residual"] * rate
+                    )
         return res
+
+    def reconcile(self):
+        # Con reconcile_on_company_currency se concilia al TC del comprobante, así que el residuo remanente
+        # es puro redondeo y no debe generar diferencia de cambio. Propagamos no_exchange_difference a todo
+        # el reconcile porque el override del partial no alcanza la fase donde se crea el asiento.
+        # Los apuntes pueden ser de compañías distintas de un mismo grupo (ejemplo: transferencia interna
+        # entre sucursal y matriz, que odoo permite si comparten root_id), por eso no leemos los campos
+        # directo del recordset: sería un ensure_one() implícito.
+        companies = self.company_id
+        if (
+            not self.env.context.get("no_exchange_difference")
+            and companies
+            and all(companies.mapped("reconcile_on_company_currency"))
+            and not self.account_id.mapped("currency_id")
+        ):
+            self = self.with_context(no_exchange_difference=True)
+        return super().reconcile()
 
     def _compute_amount_residual(self):
         """Cuando se realiza un cobro de un recibo y el comprobante que se paga tiene moneda secundaria y queda totalmente conciliado en moneda de compañía pero no en moneda secundaria (ejemplo: diferencia de un centavo) lo que hacemos con este método es forzar que quede conciliado también en moneda secundaria."""
