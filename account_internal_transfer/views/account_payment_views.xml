@@ -84,8 +84,9 @@
         </field>
     </record>
 
-    <menuitem id="menu_finance_bank_and_cash" parent="account.menu_finance" sequence="3" groups="account.group_account_basic" name="Bank and Cash"/>
+    <!-- Kept only for backwards compatibility with records/views that may still reference this xmlid; the
+         Transfers menu below no longer lives under it, so it has no children and is deactivated. -->
+    <menuitem id="menu_finance_bank_and_cash" parent="account.menu_finance" sequence="3" groups="account.group_account_basic" name="Bank and Cash" active="0"/>
 
-<!--    <menuitem action="action_account_payments_transfer" id="menu_action_account_payments_transfer" parent="menu_finance_bank_and_cash" sequence="30" groups="account.group_account_basic"/>-->
-        <menuitem action="action_account_payments_transfer" id="menu_action_account_payments_transfer" parent="account.menu_finance_entries" sequence="30" groups="account.group_account_basic"/>
+    <menuitem action="action_account_payments_transfer" id="menu_action_account_payments_transfer" parent="account.menu_finance_entries" sequence="30" groups="account.group_account_basic"/>
 </odoo>
